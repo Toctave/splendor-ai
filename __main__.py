@@ -341,10 +341,12 @@ def simulate_random_game(player_count):
 
     winners = game.winners()
 
+    for i, (action, noble_idx) in enumerate(game.history):
+        print(f"Player {i % player_count} : {action}")
+
     while len(game.history) > 0:
         game.undo_action()
 
     return winners
 
-for _ in range(1000):
-    print(simulate_random_game(2))
+print(simulate_random_game(4))
