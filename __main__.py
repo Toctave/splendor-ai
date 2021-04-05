@@ -86,7 +86,7 @@ class Player:
         return self.gold >= excess
 
     def __repr__(self):
-        return f"Player(tokens=[{token_counts_short_str(self.tokens)}], gold={self.gold}, reserved={self.reserved_cards}, bought={self.bought_cards})"
+        return f"Player(tokens=[{token_counts_short_str(self.tokens)}], gold={self.gold}, reserved={self.reserved_cards}, bought={self.bought_cards}, nobles={list(map(token_counts_short_str, self.nobles))})"
 
 def transfer_tokens(src, dst, color, count):
     src.tokens[color] -= count
@@ -237,19 +237,39 @@ class Game:
     def winners(self):
         return [i for i, player in enumerate(self.players) if player.points >= 15]
 
+    def trigger_nobles(self):
+        player = self.players[self.current_player]
+        for idx, noble in enumerate(self.board.nobles):
+            if player.can_pay(noble):
+                player.nobles.append(noble)
+                player.points += 3
+                self.board.nobles = self.board.nobles[:idx] + self.board.nobles[(idx+1):]
+                return idx
+
+        return None
+
     def play_action(self, action):
         action.play(self.board, self.players[self.current_player])
+
+        noble_idx = self.trigger_nobles()
+        
         self.current_player += 1
         if self.current_player == len(self.players):
             self.current_player = 0
-        self.history.append(action)
+        self.history.append((action, noble_idx))
         
     def undo_action(self):
-        action = self.history.pop()
+        action, noble_idx = self.history.pop()
         self.current_player -= 1
         if self.current_player < 0:
             self.current_player = len(self.players) - 1
-        action.undo(self.board, self.players[self.current_player])
+
+        player = self.players[self.current_player]
+        if noble_idx is not None:
+            player.points -= 3
+            self.board.nobles.insert(noble_idx, player.nobles.pop())
+            
+        action.undo(self.board, player)
 
 def take_and_return(counts, player):
     excess = sum(player.tokens) + player.gold + sum(counts) - 10
@@ -305,7 +325,6 @@ def available_actions(player, board):
 
 def simulate_random_game(player_count):
     game = Game(player_count)
-    print(game.board.grid)
     blocked = False
     while len(game.winners()) == 0 and not blocked:
         for _ in range(player_count):
@@ -325,8 +344,7 @@ def simulate_random_game(player_count):
     while len(game.history) > 0:
         game.undo_action()
 
-    print(game.board.grid)
-    print(game.players)
-
     return winners
 
+for _ in range(1000):
+    print(simulate_random_game(2))
